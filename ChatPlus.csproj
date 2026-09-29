@@ -13,6 +13,7 @@
     <BepInExPluginGuid>io.vrising.ChatPlus</BepInExPluginGuid>
     <LangVersion>preview</LangVersion>
     <Nullable>enable</Nullable>
+    <!-- Set this to your VRising client install path -->
     <VRisingClientPath>T:\SteamLibrary\steamapps\common\VRising</VRisingClientPath>
   </PropertyGroup>
 
