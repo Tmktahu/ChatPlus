@@ -21,8 +21,6 @@ internal static class ChatDataService
     // delta or its window will point at the wrong lines after a trim.
     public static int TrimOffset { get; private set; }
 
-    internal static bool WireTestLog = false;
-
     public struct WhisperPartner
     {
         public NetworkId Id;
@@ -196,11 +194,6 @@ internal static class ChatDataService
             int remove = Lines.Count - MaxLines;
             Lines.RemoveRange(0, remove);
             TrimOffset += remove;
-        }
-
-        if (WireTestLog)
-        {
-            Core.Log.LogInfo($"[ChatPlus][Wire] {line.Channel} | {(line.Sender.Length == 0 ? "<system>" : line.Sender)} | {line.Text}");
         }
 
         LineCaptured?.Invoke(line);

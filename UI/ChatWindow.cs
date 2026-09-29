@@ -125,7 +125,6 @@ internal static class ChatWindow
     static bool _forceHoverRecompute;
     static int _periodicRefreshCounter;
     static bool _scrollToBottomPending;
-    static double _orderDiagAt;
 
     // Rendered-window state (sliding virtualization). The mesh holds one slice
     // [winStart .. winEnd] of AllLines; winEnd lags the newest when scrolled up so
@@ -153,8 +152,6 @@ internal static class ChatWindow
     static float _logOffsetApplied;
     // Set by a scrollbar seek so the loader does not override the seek window.
     static bool _seekPending;
-    static double _shiftDiagAt;
-    static double _rebuildDiagLogAt;
     static double _rebuildFailLogAt;
     static double _rebuildBackoffUntil;
     static int _rebuildFailCount;
@@ -201,12 +198,6 @@ internal static class ChatWindow
     // further, raise the smoothing for a snappier glide.
     const float LogScrollPixelsPerNotch = 60f;
     const float LogScrollSmoothing = 25f;
-    // Debug logging. Keep both false in normal play.
-    const bool ScrollDiag = false;
-    const bool RebuildDiag = false;
-    // TEMP diagnostic: log the first and last rendered lines so the log order can be
-    // read directly. Set to false to remove the log spam.
-    const bool OrderDiag = false;
 
     struct SendTarget
     {
@@ -483,10 +474,8 @@ _hoverLineIdx = -1;
         _logOffsetTarget = 0f;
         _logOffsetApplied = 0f;
         _seekPending = false;
-        _shiftDiagAt = 0;
         _scrollToBottomPending = false;
         _periodicRefreshCounter = 0;
-        _rebuildDiagLogAt = 0;
         _rebuildFailLogAt = 0;
         _rebuildBackoffUntil = 0;
         _rebuildFailCount = 0;
@@ -2291,20 +2280,6 @@ _hoverLineIdx = -1;
                     !_scrollbarDragging && _renderedLines.Count > 0 &&
                     TryGetViewportLineBounds(out topIdx, out bottomIdx);
 
-                // Throttled diagnostic for the sliding window. Off by default.
-                if (ScrollDiag && (overLog || userScrolled) &&
-                    Time.realtimeSinceStartupAsDouble - _shiftDiagAt > 0.5)
-                {
-                    _shiftDiagAt = Time.realtimeSinceStartupAsDouble;
-                    bool ok = haveBounds || TryGetViewportLineBounds(out _, out _);
-                    Core.Log.LogInfo(
-                        $"[ChatPlus][Scroll] newest={newest} win=[{_winStart}..{_winEnd}] rendered={_renderedLines.Count} " +
-                        $"norm={curScroll:0.###} atBottom={atBottom} up={intentUp} down={intentDown} wheel={wheel:0.###} " +
-                        $"overLog={overLog} follow={_followTail} scrollable={scrollable} contentH={contentH:0} vpH={vpH:0} " +
-                        $"bounds={ok} top={(haveBounds ? topIdx : -1)} bot={(haveBounds ? bottomIdx : -1)} " +
-                        $"above={(haveBounds ? topIdx - _winStart : -999)} below={(haveBounds ? _winEnd - bottomIdx : -999)}");
-                }
-
                 // Persistent tail follow. A new message raises `newest` before the
                 // content resizes, so `atBottom` can read false on that same frame. A
                 // memory flag keeps the follow alive so new messages never drop, and it
@@ -3270,7 +3245,6 @@ _hoverLineIdx = -1;
             _rootRect.sizeDelta = new Vector2(WinW, WinH);
             RefreshBakedSizes();
             RefreshGeometryFields();
-            Core.Log.LogDebug($"[ChatPlus] Layout pos=({_rootRect.anchoredPosition.x:0},{_rootRect.anchoredPosition.y:0}) size=({WinW:0}x{WinH:0})");
         }
         catch (Exception ex)
         {
@@ -3367,7 +3341,6 @@ _hoverLineIdx = -1;
             Services.SettingsService.WindowX = _rootRect.anchoredPosition.x;
             Services.SettingsService.WindowY = _rootRect.anchoredPosition.y;
             RefreshGeometryFields();
-            Core.Log.LogDebug($"[ChatPlus] Layout pos=({_rootRect.anchoredPosition.x:0},{_rootRect.anchoredPosition.y:0}) size=({WinW:0}x{WinH:0})");
         }
         catch
         {
@@ -3384,13 +3357,6 @@ _hoverLineIdx = -1;
             MarkActivity();
         }
         _logDirty = true;
-    }
-
-    static string Trunc(string text, int max)
-    {
-        if (string.IsNullOrEmpty(text)) return string.Empty;
-        string flat = text.Replace('\n', ' ').Replace('\r', ' ');
-        return flat.Length <= max ? flat : flat.Substring(0, max);
     }
 
     static int VisibleLength(string richText)
@@ -3621,31 +3587,6 @@ _hoverLineIdx = -1;
             else if (!tail)
             {
                 _anchorTopPending = false;
-            }
-
-            // Throttled diagnostic so we can watch render size / cost without spam.
-            if (RebuildDiag && Time.realtimeSinceStartupAsDouble - _rebuildDiagLogAt > 10.0)
-            {
-                _rebuildDiagLogAt = Time.realtimeSinceStartupAsDouble;
-                double ms = (Time.realtimeSinceStartupAsDouble - t0) * 1000.0;
-                Core.Log.LogInfo($"[ChatPlus][Rebuild] win=[{_winStart}..{_winEnd}] newest={newest} lines={_renderedLines.Count} chars={_log.text.Length} tail={tail} meshMs={ms:0.0}");
-            }
-
-            // TEMP diagnostic: print the first and last few rendered lines so the
-            // on-screen order can be compared against the saved file.
-            if (OrderDiag && Time.realtimeSinceStartupAsDouble - _orderDiagAt > 1.0)
-            {
-                _orderDiagAt = Time.realtimeSinceStartupAsDouble;
-                var diag = new System.Text.StringBuilder();
-                diag.Append($"[ChatPlus][Order] win=[{_winStart}..{_winEnd}] total={lines.Count} tail={tail} first5:");
-                int headEnd = Math.Min(_winEnd, _winStart + 4);
-                for (int i = _winStart; i <= headEnd; i++)
-                    diag.Append($" {lines[i].ReceivedUtc:HH:mm:ss}|{Trunc(lines[i].Text, 24)}");
-                diag.Append(" | last5:");
-                int tailStart = Math.Max(_winStart, _winEnd - 4);
-                for (int i = tailStart; i <= _winEnd; i++)
-                    diag.Append($" {lines[i].ReceivedUtc:HH:mm:ss}|{Trunc(lines[i].Text, 24)}");
-                Core.Log.LogInfo(diag.ToString());
             }
         }
         catch (Exception ex)

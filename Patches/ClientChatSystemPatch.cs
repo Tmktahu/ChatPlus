@@ -17,6 +17,9 @@ internal static class ClientChatSystemPatch
         if (__instance == null) return;
         if (__instance.World == null || !__instance.World.IsCreated) return;
 
+        try { LocalBubbleService.SetSystem(__instance); }
+        catch { }
+
         try { NativeChatService.ApplyHide(); }
         catch { }
 
@@ -57,6 +60,9 @@ internal static class ClientChatSystemPatch
         if (!Core.HasInitialized) return;
         if (__instance == null) return;
         if (__instance.World == null || !__instance.World.IsCreated) return;
+
+        try { LocalBubbleService.Tick(); }
+        catch { }
 
         try { NativeChatService.ApplyHide(); }
         catch { }

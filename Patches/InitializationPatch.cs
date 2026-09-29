@@ -100,6 +100,7 @@ internal static class InitializationPatch
         try { _canvasCaptured = false; } catch { }
         try { Services.NativeChatService.Reset(); } catch { }
         try { Services.InboundChatService.Reset(); } catch { }
+        try { Services.LocalBubbleService.Reset(); } catch { }
         try { Services.ClanHudService.Reset(); } catch { }
         try { Services.ChatAvailabilityService.OnWorldTeardown(); } catch { }
         try { Services.AdminService.OnWorldTeardown(); } catch { }

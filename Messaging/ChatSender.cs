@@ -1,3 +1,4 @@
+using ChatPlus.Services;
 using Il2CppInterop.Runtime;
 using ProjectM;
 using ProjectM.Network;
@@ -9,8 +10,6 @@ namespace ChatPlus.Messaging;
 internal static class ChatSender
 {
     static EntityManager EntityManager => Core.EntityManager;
-
-    const bool EnableLocalBubble = false;
 
     // The game stores chat text in a FixedString512Bytes (2-byte length + 510 UTF-8
     // bytes), and wraps outgoing text in <noparse>...</noparse> (+19 bytes) before the
@@ -135,25 +134,13 @@ internal static class ChatSender
         {
             NetworkId to = type == ChatMessageType.Whisper ? target : SafeGetNetworkId(Core.LocalUser);
             ChatHelper.SendChatMessageOfType(EntityManager, text, type, to);
-            Core.Log.LogDebug($"[ChatPlus] Sent {type} to={to} text={text}");
 
-            if (EnableLocalBubble)
+            // The server does not echo a Local message back to its sender, so the native
+            // ClientChatSystem never shows the sender their own over-head bubble. Queue the
+            // text and let LocalBubbleService reproduce the native bubble on the client.
+            if (type == ChatMessageType.Local)
             {
-                try
-                {
-                    ServerChatMessageType serverType = type switch
-                    {
-                        ChatMessageType.Global => ServerChatMessageType.Global,
-                        ChatMessageType.Team => ServerChatMessageType.Team,
-                        ChatMessageType.System => ServerChatMessageType.System,
-                        _ => ServerChatMessageType.Local,
-                    };
-                    NetworkId fromUser = SafeGetNetworkId(Core.LocalUser);
-                    NetworkId fromChar = SafeGetNetworkId(Core.LocalCharacter);
-                    Core.Log.LogInfo($"[ChatPlus] AddLocalMessage {serverType} fromUser={fromUser} fromChar={fromChar}");
-                    ClientSystemChatUtils.AddLocalMessage(EntityManager, text, serverType, fromUser, default, fromChar);
-                }
-                catch (Exception ex) { Core.Log.LogDebug($"[ChatPlus] Local bubble skipped: {ex.Message}"); }
+                LocalBubbleService.Enqueue(text);
             }
         }
         catch (Exception ex)
@@ -201,7 +188,6 @@ internal static class ChatSender
                 MessageType = ChatMessageType.Whisper,
                 ReceiverEntity = target,
             });
-            Core.Log.LogDebug($"[ChatPlus] Sent Whisper to={target} text={text}");
         }
         catch (Exception ex)
         {
