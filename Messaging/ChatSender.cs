@@ -135,7 +135,7 @@ internal static class ChatSender
         {
             NetworkId to = type == ChatMessageType.Whisper ? target : SafeGetNetworkId(Core.LocalUser);
             ChatHelper.SendChatMessageOfType(EntityManager, text, type, to);
-            Core.Log.LogInfo($"[ChatPlus] Sent {type} to={to} text={text}");
+            Core.Log.LogDebug($"[ChatPlus] Sent {type} to={to} text={text}");
 
             if (EnableLocalBubble)
             {
@@ -201,7 +201,7 @@ internal static class ChatSender
                 MessageType = ChatMessageType.Whisper,
                 ReceiverEntity = target,
             });
-            Core.Log.LogInfo($"[ChatPlus] Sent Whisper to={target} text={text}");
+            Core.Log.LogDebug($"[ChatPlus] Sent Whisper to={target} text={text}");
         }
         catch (Exception ex)
         {

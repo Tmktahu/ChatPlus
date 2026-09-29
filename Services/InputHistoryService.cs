@@ -16,6 +16,7 @@ internal static class InputHistoryService
 
     static readonly List<string> _entries = new();
     static bool _loaded;
+    static bool _dirty;
 
     public static void Initialize()
     {
@@ -45,12 +46,13 @@ internal static class InputHistoryService
             _entries.RemoveRange(0, _entries.Count - MaxEntries);
         }
 
+        _dirty = true;
         Save();
     }
 
     public static void Flush()
     {
-        Save();
+        if (_dirty) Save();
     }
 
     static void Load()
@@ -80,6 +82,8 @@ internal static class InputHistoryService
 
             string json = JsonSerializer.Serialize(_entries.ToArray(), new JsonSerializerOptions { WriteIndented = false });
             File.WriteAllText(HistoryFile, json);
+
+            _dirty = false;
         }
         catch (Exception ex)
         {

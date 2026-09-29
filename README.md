@@ -9,11 +9,11 @@ ChatPlus is a V Rising client mod that replaces the vanilla chat with a movable,
 ## Features
 
 - **Custom chat window** - A movable, resizable, draggable window. Grab the dotted grip in a bottom corner to move it, drag the log or use the wheel to scroll, and let it fade after 15 seconds idle.
-- **Channel rail** - Filter the log by Global, Local, Clan, and Whisper. Optional channel tags (such as `[G]`, `[L]`, `[C]`) show the channel on each line.
+- **Channel tags** - Optional tags (such as `[G]`, `[L]`, `[C]`, `[W]`, `[S]`) show the channel on each line.
 - **Timestamps** - Show or hide a timestamp on each line.
 - **Colors** - Set the label and text color for each channel, plus your own name and message, plus admin names and admin messages. Each special color has an "Applies to" scope for Global, Local, Clan, and Whisper. A channel with a scope turned off falls back to the next color, then to the channel color.
 - **Admin tag** - A player who is an admin shows an `[ADMIN]` tag after their name.
-- **Copy** - Click any line to copy it with its timestamp. "Copy chat" copies the whole log.
+- **Copy** - While the chat box is focused, click a line to copy it with its timestamp. "Copy chat" copies the lines currently shown.
 - **Input recall** - Up and Down cycle your sent lines, newest first. Recall survives restarts, up to 1000 lines.
 - **Command hotkeys** - Bind a key or a Ctrl, Alt, Shift combination to a list of commands or messages. The entries fire in order to the current channel while the chat box is not focused. Each entry has an enable toggle.
 - **Layout controls** - Set log opacity, input opacity, window position and size, and the clan HUD offset. A "Right side" button mirrors the layout.

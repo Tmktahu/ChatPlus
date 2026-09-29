@@ -34,25 +34,8 @@ internal static class InitializationPatch
         try
         {
             Core.Initialize(__instance);
-            Core.Log.LogInfo($"[ChatPlus] AddLocalMessage overload check: {ResolveAddLocalMessageSig()}");
         }
         catch (Exception ex) { Core.Log.LogError($"[ChatPlus] Initialize failed: {ex}"); }
-    }
-
-    static string ResolveAddLocalMessageSig()
-    {
-        try
-        {
-            var m = typeof(ClientSystemChatUtils).GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
-            foreach (var mi in m)
-            {
-                if (mi.Name != "AddLocalMessage") continue;
-                var ps = mi.GetParameters();
-                return $"{mi.Name}({string.Join(", ", System.Array.ConvertAll(ps, p => p.ParameterType.Name + " " + p.Name))})";
-            }
-            return "AddLocalMessage not found";
-        }
-        catch (Exception ex) { return $"resolve failed: {ex.Message}"; }
     }
 
     [HarmonyPatch(typeof(UICanvasBase), nameof(UICanvasBase.Awake))]

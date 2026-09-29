@@ -206,7 +206,7 @@ internal static class ChatWindow
     const bool RebuildDiag = false;
     // TEMP diagnostic: log the first and last rendered lines so the log order can be
     // read directly. Set to false to remove the log spam.
-    const bool OrderDiag = true;
+    const bool OrderDiag = false;
 
     struct SendTarget
     {
@@ -1179,11 +1179,11 @@ _hoverLineIdx = -1;
         AddHelpHeader(content.transform, layer, "Hotkeys", ref y);
         AddHelpBody(content.transform, layer, "Add entries in Settings. Click the key box and press a key or Ctrl, Alt, Shift combo. Each entry can hold a list of commands or messages; they fire to the current channel, one after another, while the chat box is not focused. The checkbox right of the key box toggles the entry on and off (on by default). Use \"+ Add command\" for more lines and the small X to remove one. The right-side X deletes the whole entry.", ref y);
         AddHelpHeader(content.transform, layer, "Copy", ref y);
-        AddHelpBody(content.transform, layer, "Click any chat line to copy it with its timestamp. Click \"Copy chat\" to copy the whole log.", ref y);
+        AddHelpBody(content.transform, layer, "While the chat box is focused, click a chat line to copy it with its timestamp. Click \"Copy chat\" to copy the lines currently shown. Timestamps appear only when the Timestamp toggle is on.", ref y);
         AddHelpHeader(content.transform, layer, "Admins", ref y);
         AddHelpBody(content.transform, layer, "A player who is an admin shows an [ADMIN] tag after their name. The admin name and admin message colors are set with the \"Admin name\" and \"Admin messages\" swatches in Settings. The admin colors also apply to your own lines when you are an admin. Each special color row has an \"Applies to\" switch row for Global, Local, Clan, and Whisper. A channel with a switch off falls back to the next color, then to the channel color.", ref y);
         AddHelpHeader(content.transform, layer, "Look and layout", ref y);
-        AddHelpBody(content.transform, layer, "Sliders set log and input transparency. The position fields move and size the window. Grab the dotted grip in either bottom corner to drag. The \"Right side\" button mirrors the layout. Grab the chat history and drag to scroll it; the wheel also scrolls. Timestamps and channel tags (like [L], [G]) can be toggled in Settings.", ref y);
+        AddHelpBody(content.transform, layer, "Sliders set log and input transparency. The position fields move and size the window. Grab the dotted grip in the bottom corner to drag. The \"Right side\" button mirrors the layout. Grab the chat history and drag to scroll it; the wheel also scrolls. Timestamps and channel tags (like [L], [G]) can be toggled in Settings.", ref y);
         AddHelpHeader(content.transform, layer, "Miscellaneous", ref y);
         AddHelpBody(content.transform, layer, "The window fades after 15 seconds idle.", ref y);
 
@@ -3270,7 +3270,7 @@ _hoverLineIdx = -1;
             _rootRect.sizeDelta = new Vector2(WinW, WinH);
             RefreshBakedSizes();
             RefreshGeometryFields();
-            Core.Log.LogInfo($"[ChatPlus] Layout pos=({_rootRect.anchoredPosition.x:0},{_rootRect.anchoredPosition.y:0}) size=({WinW:0}x{WinH:0})");
+            Core.Log.LogDebug($"[ChatPlus] Layout pos=({_rootRect.anchoredPosition.x:0},{_rootRect.anchoredPosition.y:0}) size=({WinW:0}x{WinH:0})");
         }
         catch (Exception ex)
         {
@@ -3367,7 +3367,7 @@ _hoverLineIdx = -1;
             Services.SettingsService.WindowX = _rootRect.anchoredPosition.x;
             Services.SettingsService.WindowY = _rootRect.anchoredPosition.y;
             RefreshGeometryFields();
-            Core.Log.LogInfo($"[ChatPlus] Layout pos=({_rootRect.anchoredPosition.x:0},{_rootRect.anchoredPosition.y:0}) size=({WinW:0}x{WinH:0})");
+            Core.Log.LogDebug($"[ChatPlus] Layout pos=({_rootRect.anchoredPosition.x:0},{_rootRect.anchoredPosition.y:0}) size=({WinW:0}x{WinH:0})");
         }
         catch
         {
