@@ -19,6 +19,7 @@ ChatPlus is a V Rising client mod that replaces the vanilla chat with a movable,
 - **Layout controls** - Set log opacity, input opacity, window position and size, and the clan HUD offset. A "Right side" button mirrors the layout.
 - **Persistent history** - The last 1000 chat lines are saved and restored on the next session.
 - **Vanilla toggle** - Press F6 to swap between ChatPlus and the vanilla chat.
+- **Local bubble** - Your own Local chat shows the over-head bubble on your character, which the game normally skips for the sender.
 - **Client-side only** - Install it on your client. It does not need a server install and does not change other players.
 
 ## Help

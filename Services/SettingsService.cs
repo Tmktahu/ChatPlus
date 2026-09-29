@@ -45,7 +45,7 @@ internal static class SettingsService
 
     public static float WindowX
     {
-        get => _settings.WindowX ?? 16f;
+        get => _settings.WindowX ?? 10f;
         set
         {
             if (_settings.WindowX.HasValue && Math.Abs(_settings.WindowX.Value - value) < 0.01f) return;
@@ -56,7 +56,7 @@ internal static class SettingsService
 
     public static float WindowY
     {
-        get => _settings.WindowY ?? 16f;
+        get => _settings.WindowY ?? 130f;
         set
         {
             if (_settings.WindowY.HasValue && Math.Abs(_settings.WindowY.Value - value) < 0.01f) return;
@@ -67,7 +67,7 @@ internal static class SettingsService
 
     public static float WindowWidth
     {
-        get => _settings.WindowWidth ?? 460f;
+        get => _settings.WindowWidth ?? 500f;
         set
         {
             float clamped = Math.Clamp(value, 300f, 2000f);
@@ -79,7 +79,7 @@ internal static class SettingsService
 
     public static float WindowHeight
     {
-        get => _settings.WindowHeight ?? 340f;
+        get => _settings.WindowHeight ?? 600f;
         set
         {
             float clamped = Math.Clamp(value, 200f, 1200f);
@@ -91,7 +91,7 @@ internal static class SettingsService
 
     public static float ClanListYOffset
     {
-        get => _settings.ClanListYOffset ?? 0f;
+        get => _settings.ClanListYOffset ?? 350f;
         set
         {
             float clamped = Math.Clamp(value, -500f, 500f);
@@ -151,8 +151,8 @@ internal static class SettingsService
     {
         hex = channel switch
         {
-            ChatChannel.Global => _settings.ChannelGlobalHex ?? "5993FF",
-            ChatChannel.Local => _settings.ChannelLocalHex ?? "FFFFFF",
+            ChatChannel.Global => _settings.ChannelGlobalHex ?? "5999FF",
+            ChatChannel.Local => _settings.ChannelLocalHex ?? "F2EBDB",
             ChatChannel.Clan => _settings.ChannelClanHex ?? "59D973",
             ChatChannel.Whisper => _settings.ChannelWhisperHex ?? "AE7CEB",
             ChatChannel.System => _settings.ChannelSystemHex ?? "FF9933",
@@ -180,8 +180,8 @@ internal static class SettingsService
     {
         hex = channel switch
         {
-            ChatChannel.Global => _settings.ChannelGlobalLabelHex ?? "5993FF",
-            ChatChannel.Local => _settings.ChannelLocalLabelHex ?? "FFFFFF",
+            ChatChannel.Global => _settings.ChannelGlobalLabelHex ?? "5999FF",
+            ChatChannel.Local => _settings.ChannelLocalLabelHex ?? "F2EBDB",
             ChatChannel.Clan => _settings.ChannelClanLabelHex ?? "59D973",
             ChatChannel.Whisper => _settings.ChannelWhisperLabelHex ?? "AE7CEB",
             ChatChannel.System => _settings.ChannelSystemLabelHex ?? "FF9933",
@@ -208,7 +208,7 @@ internal static class SettingsService
     public static bool TryGetSelfHex(out string nameHex, out string messageHex)
     {
         nameHex = string.IsNullOrEmpty(_settings.SelfNameHex) ? "F2EBDB" : _settings.SelfNameHex!;
-        messageHex = string.IsNullOrEmpty(_settings.SelfMessageHex) ? "F2EBDB" : _settings.SelfMessageHex!;
+        messageHex = string.IsNullOrEmpty(_settings.SelfMessageHex) ? "B9C9D3" : _settings.SelfMessageHex!;
         return true;
     }
 
@@ -222,7 +222,7 @@ internal static class SettingsService
     public static bool TryGetAdminHex(out string nameHex, out string messageHex)
     {
         nameHex = string.IsNullOrEmpty(_settings.AdminNameHex) ? "FFD24A" : _settings.AdminNameHex!;
-        messageHex = string.IsNullOrEmpty(_settings.AdminMessageHex) ? "F2EBDB" : _settings.AdminMessageHex!;
+        messageHex = string.IsNullOrEmpty(_settings.AdminMessageHex) ? "FFD24A" : _settings.AdminMessageHex!;
         return true;
     }
 
@@ -332,7 +332,7 @@ internal static class SettingsService
 
     class StoredSettings
     {
-        public float LogBackgroundOpacity { get; set; } = 0.70f;
+        public float LogBackgroundOpacity { get; set; } = 0.8f;
         public float InputBackgroundOpacity { get; set; } = 0.75f;
         public float? WindowX { get; set; }
         public float? WindowY { get; set; }
@@ -357,7 +357,19 @@ internal static class SettingsService
         public string? SelfMessageHex { get; set; }
         public string? AdminNameHex { get; set; }
         public string? AdminMessageHex { get; set; }
-        public System.Collections.Generic.Dictionary<string, bool> ColorChannelScopes { get; set; } = new();
+        public System.Collections.Generic.Dictionary<string, bool> ColorChannelScopes { get; set; } = new()
+        {
+            // Special-role colors default off for messages and on for names. Names are
+            // absent here, so IsColorScopeEnabled falls back to true for them.
+            ["SelfMessage:Global"] = false,
+            ["SelfMessage:Local"] = false,
+            ["SelfMessage:Clan"] = false,
+            ["SelfMessage:Whisper"] = false,
+            ["AdminMessage:Global"] = false,
+            ["AdminMessage:Local"] = false,
+            ["AdminMessage:Clan"] = false,
+            ["AdminMessage:Whisper"] = false,
+        };
         public System.Collections.Generic.List<HotkeyEntry> Hotkeys { get; set; } = new();
     }
 
