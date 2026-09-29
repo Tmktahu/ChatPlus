@@ -43,9 +43,14 @@ internal static class InputSuppressionPatch
         (Time.realtimeSinceStartupAsDouble - _lastWheelScrollAt) < WheelSuppressSeconds ||
         Mathf.Abs(Input.mouseScrollDelta.y) > 0.01f;
 
+    // Zoom is blocked ONLY while the chat UI owns the wheel: the window is focused
+    // (typing) or showing Settings/Help AND the pointer is over the window. When the
+    // pointer is outside the window the camera systems run normally, so the wheel
+    // zooms the camera and right-drag pan and follow are never interrupted.
     static bool ShouldBlockCameraZoom => WorldLive && !ConsoleOpen && ChatWindow.IsModdedActive &&
+        Services.SettingsService.ZoomCaptureEnabled &&
         WheelEngaged &&
-        (ChatWindow.IsTyping || (ChatWindow.IsSettingsOpen && ChatWindow.IsPointerOverSettings));
+        ChatWindow.CapturesWheel;
 
     public static void Apply(Harmony harmony)
     {
@@ -211,9 +216,9 @@ internal static class InputSuppressionPatch
         catch { return true; }
     }
 
-    // Zoom-only suppression while the chat box is focused. The camera systems handle
+    // Zoom-only suppression while the chat UI owns the wheel. The camera systems handle
     // BOTH wheel zoom and right-drag pan in the same update, so we only bail out on
-    // frames where the wheel is actually scrolling; right-drag pan frames pass through.
+    // frames where the wheel is over the window; pan and follow frames pass through.
     static bool TopdownCameraSystem_OnUpdate_Prefix()
     {
         try { return !ShouldBlockCameraZoom; }

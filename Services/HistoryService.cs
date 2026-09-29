@@ -75,21 +75,52 @@ internal static class HistoryService
             StoredLine[]? stored = JsonSerializer.Deserialize<StoredLine[]>(json);
             if (stored == null || stored.Length == 0) return;
 
+            // Older builds wrote the restored block in reverse, so the file on disk can
+            // be out of order. Parse, detect that, and sort ascending before seeding.
+            var parsed = new List<ChatLine>(stored.Length);
+            bool repaired = false;
+            DateTime previous = DateTime.MinValue;
+            foreach (StoredLine s in stored)
+            {
+                if (!Enum.TryParse<ChatChannel>(s.Channel, out ChatChannel channel)) channel = ChatChannel.Other;
+                DateTime ts = DateTime.TryParse(s.Timestamp, null, System.Globalization.DateTimeStyles.RoundtripKind, out DateTime parsedTs)
+                    ? parsedTs
+                    : DateTime.UtcNow;
+                if (ts < previous) repaired = true;
+                previous = ts;
+                parsed.Add(ChatLine.Restore(channel, s.Sender ?? string.Empty, s.Text ?? string.Empty, ts, default));
+            }
+
+            // Stable sort keeps equal timestamps in file order.
+            var ordered = parsed.OrderBy(l => l.ReceivedUtc).ToList();
+
             // Seed only a small recent tail into the live log so a large cross-session
             // history can't flood the chat window. SeedLine prepends, so iterate
             // newest -> oldest to keep ascending display order.
-            int start = Math.Max(0, stored.Length - SeedTailCount);
-            for (int i = stored.Length - 1; i >= start; i--)
+            int start = Math.Max(0, ordered.Count - SeedTailCount);
+            for (int i = ordered.Count - 1; i >= start; i--)
             {
-                StoredLine s = stored[i];
-                if (!Enum.TryParse<ChatChannel>(s.Channel, out ChatChannel channel)) channel = ChatChannel.Other;
-                DateTime ts = DateTime.TryParse(s.Timestamp, null, System.Globalization.DateTimeStyles.RoundtripKind, out DateTime parsed)
-                    ? parsed
-                    : DateTime.UtcNow;
-                ChatDataService.SeedLine(ChatLine.Restore(channel, s.Sender ?? string.Empty, s.Text ?? string.Empty, ts, default));
+                ChatLine line = ordered[i];
+                ChatDataService.SeedLine(ChatLine.Restore(line.Channel, line.Sender, line.Text, line.ReceivedUtc, default));
             }
 
-            Core.Log.LogInfo($"[ChatPlus] Restored {stored.Length - start} chat lines from history.");
+            // Build the persisted store from the same ascending list. Seeded lines are
+            // no longer recorded through LineCaptured, so this is the only source of the
+            // restored history in _pending. New lines append after it.
+            _pending.Clear();
+            for (int i = start; i < ordered.Count; i++)
+            {
+                _pending.Add(ordered[i]);
+            }
+            if (_pending.Count > MaxStoredLines)
+            {
+                _pending.RemoveRange(0, _pending.Count - MaxStoredLines);
+            }
+
+            // Rewrite a file that was out of order, so the damage does not persist.
+            if (repaired) _dirty = true;
+
+            Core.Log.LogInfo($"[ChatPlus] Restored {ordered.Count - start} chat lines from history (repaired={repaired}).");
         }
         finally
         {

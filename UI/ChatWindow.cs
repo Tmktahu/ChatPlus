@@ -125,6 +125,7 @@ internal static class ChatWindow
     static bool _forceHoverRecompute;
     static int _periodicRefreshCounter;
     static bool _scrollToBottomPending;
+    static double _orderDiagAt;
 
     // Rendered-window state (sliding virtualization). The mesh holds one slice
     // [winStart .. winEnd] of AllLines; winEnd lags the newest when scrolled up so
@@ -203,6 +204,9 @@ internal static class ChatWindow
     // Debug logging. Keep both false in normal play.
     const bool ScrollDiag = false;
     const bool RebuildDiag = false;
+    // TEMP diagnostic: log the first and last rendered lines so the log order can be
+    // read directly. Set to false to remove the log spam.
+    const bool OrderDiag = true;
 
     struct SendTarget
     {
@@ -282,6 +286,29 @@ internal static class ChatWindow
     public static bool IsSettingsOpen => _viewSettings && _open && _moddedActive;
     public static bool IsPointerOverSettings => IsSettingsOpen && IsPointerOverWindow;
     public static bool IsScrollbarEngaged => _open && _moddedActive && _chatActive && !_viewSettings && _alpha > 0.01f && (IsPointerOverScrollbar() || _scrollbarDragging);
+
+    // True when the modded UI owns the mouse wheel: the window is visible, the chat UI
+    // is focused (typing) or showing Settings/Help, and the pointer is over the window.
+    // The capture region is the whole window, in every view. Outside the window the
+    // wheel belongs to the camera. This is the single gate for zoom suppression.
+    public static bool CapturesWheel
+    {
+        get
+        {
+            try
+            {
+                if (!Core.HasInitialized) return false;
+                if (Services.ConsoleGateService.IsConsoleOpen) return false;
+                if (!_moddedActive || !_open || _alpha <= 0.01f) return false;
+                if (!(_chatActive || IsSettingsOpen)) return false;
+                return IsPointerOverWindow;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
 
     public static void EnsureBuilt()
     {
@@ -978,24 +1005,28 @@ _hoverLineIdx = -1;
 
         _colorSwatchRows.Clear();
         float colorY = -230f;
+        float lastStripY = colorY;
         for (int row = 0; row < _colorRowNames.Length; row++)
         {
-            BuildColorSwatchRow(content.transform, layer, row, colorY);
             if (ColorGroupForRow(row) is ChatColorGroup scopeGroup)
             {
-                BuildColorChannelStrip(content.transform, layer, scopeGroup, colorY - 22f);
-                colorY -= 46f;
+                float stripY = colorY - 21f;
+                BuildColorGroupBackground(content.transform, layer, colorY, stripY);
+                BuildColorSwatchRow(content.transform, layer, row, colorY);
+                lastStripY = stripY;
+                BuildColorChannelStrip(content.transform, layer, scopeGroup, stripY);
+                colorY -= 52f;
             }
             else
             {
+                BuildColorSwatchRow(content.transform, layer, row, colorY);
                 colorY -= 24f;
             }
         }
         RefreshColorSelection();
 
-        // colorY now sits 24 pixels below the last color row. The last strip sits
-        // 24 above colorY, so the Display header starts 22 below that strip.
-        float displayHintY = colorY + 2f;
+        // The Display header starts 22 pixels below the last color strip.
+        float displayHintY = lastStripY - 22f;
 
         // --- Display section ---
         GameObject dispHint = UiFactory.Create("DisplayHint", content.transform, layer);
@@ -1140,7 +1171,7 @@ _hoverLineIdx = -1;
 
         float y = -8f;
         AddHelpHeader(content.transform, layer, "Chat", ref y);
-        AddHelpBody(content.transform, layer, "Enter focuses the box and sends. Empty Enter or Escape defocuses without closing. F6 swaps between Chat+ and the vanilla chat.", ref y);
+        AddHelpBody(content.transform, layer, "Enter focuses the box and sends. Empty Enter or Escape defocuses without closing. F6 swaps between ChatPlus and the vanilla chat.", ref y);
         AddHelpHeader(content.transform, layer, "Channels", ref y);
         AddHelpBody(content.transform, layer, "TAB cycles the send channel. The label below the input always shows the active one. Some servers restrict Global chat. Messages are capped at 490 bytes, roughly 480 normal characters; accented letters, emoji, and other symbols count as more.", ref y);
         AddHelpHeader(content.transform, layer, "Recall", ref y);
@@ -1150,7 +1181,7 @@ _hoverLineIdx = -1;
         AddHelpHeader(content.transform, layer, "Copy", ref y);
         AddHelpBody(content.transform, layer, "Click any chat line to copy it with its timestamp. Click \"Copy chat\" to copy the whole log.", ref y);
         AddHelpHeader(content.transform, layer, "Admins", ref y);
-        AddHelpBody(content.transform, layer, "A player who is an admin shows an [ADMIN] tag after their name. The admin name and admin message colors are set with the \"Admin name\" and \"Admin messages\" swatches in Settings. The admin colors also apply to your own lines when you are an admin. Each special color row has an \"Applies to\" switch row for Global (G), Local (L), Clan (C), and Whisper (W). A channel with a switch off falls back to the next color, then to the channel color.", ref y);
+        AddHelpBody(content.transform, layer, "A player who is an admin shows an [ADMIN] tag after their name. The admin name and admin message colors are set with the \"Admin name\" and \"Admin messages\" swatches in Settings. The admin colors also apply to your own lines when you are an admin. Each special color row has an \"Applies to\" switch row for Global, Local, Clan, and Whisper. A channel with a switch off falls back to the next color, then to the channel color.", ref y);
         AddHelpHeader(content.transform, layer, "Look and layout", ref y);
         AddHelpBody(content.transform, layer, "Sliders set log and input transparency. The position fields move and size the window. Grab the dotted grip in either bottom corner to drag. The \"Right side\" button mirrors the layout. Grab the chat history and drag to scroll it; the wheel also scrolls. Timestamps and channel tags (like [L], [G]) can be toggled in Settings.", ref y);
         AddHelpHeader(content.transform, layer, "Miscellaneous", ref y);
@@ -1267,7 +1298,7 @@ _hoverLineIdx = -1;
     const float HkGapH = 8f;
     // Y of the Hotkeys rows container. Must match the color section plus the
     // Display section heights in BuildSettingsView.
-    const float HKFixedTop = 750f;
+    const float HKFixedTop = 767f;
 
     static float HkEntryHeight(Services.SettingsService.HotkeyEntry entry)
     {
@@ -1760,6 +1791,7 @@ _hoverLineIdx = -1;
 
         ChatSender.SendWhisper(message, target);
         ChatDataService.AddWhisperEcho(target, name, message);
+        SelectWhisperPartner(target);
         return true;
     }
 
@@ -1838,7 +1870,8 @@ _hoverLineIdx = -1;
 
     static void RebuildCycle()
     {
-        int previousChannel = _cycle.Count > 0 ? (int)_cycle[Math.Clamp(_cycleIndex, 0, _cycle.Count - 1)].Channel : -1;
+        bool hadPrevious = _cycle.Count > 0;
+        SendTarget previous = hadPrevious ? _cycle[Math.Clamp(_cycleIndex, 0, _cycle.Count - 1)] : default;
 
         _cycle.Clear();
 
@@ -1856,7 +1889,15 @@ _hoverLineIdx = -1;
         if (_cycle.Count == 0)
             _cycle.Add(new SendTarget(ChatChannel.Local, default, "Local"));
 
-        int preferredNew = _cycle.FindIndex(t => (int)t.Channel == previousChannel);
+        int preferredNew = -1;
+        if (hadPrevious)
+        {
+            // Keep the exact whisper partner, not only the channel, so a later rebuild
+            // does not move the selection to a different person.
+            preferredNew = previous.Channel == ChatChannel.Whisper
+                ? _cycle.FindIndex(t => t.Channel == ChatChannel.Whisper && t.Target == previous.Target)
+                : _cycle.FindIndex(t => t.Channel == previous.Channel);
+        }
         _cycleIndex = preferredNew >= 0 ? preferredNew : 0;
         UpdateChannelLabel();
     }
@@ -1865,6 +1906,22 @@ _hoverLineIdx = -1;
     {
         if (_cycle.Count == 0) return;
         _cycleIndex = (_cycleIndex + 1) % _cycle.Count;
+        UpdateChannelLabel();
+    }
+
+    // After a whisper command, make the whisper channel for that player the active send
+    // channel. A brand new partner is registered by the echo but is not in the cycle
+    // until the next rebuild, so rebuild once when the partner is not found.
+    static void SelectWhisperPartner(NetworkId id)
+    {
+        int index = _cycle.FindIndex(t => t.Channel == ChatChannel.Whisper && t.Target == id);
+        if (index < 0)
+        {
+            RebuildCycle();
+            index = _cycle.FindIndex(t => t.Channel == ChatChannel.Whisper && t.Target == id);
+        }
+        if (index < 0) return;
+        _cycleIndex = index;
         UpdateChannelLabel();
     }
 
@@ -2164,6 +2221,10 @@ _hoverLineIdx = -1;
 
                 int newest = ChatDataService.AllLines.Count - 1;
                 bool overLog = IsPointerOverLogViewport();
+                // The wheel belongs to the chat log only when the chat UI captures it:
+                // the compose field is focused AND the pointer is over the window. The
+                // capture region is the whole window, not just the log viewport.
+                bool wheelForLog = _chatActive && !_viewSettings && CapturesWheel;
 
                 float contentH = _scrollContent != null ? _scrollContent.rect.height : 0f;
                 float vpH = (_scroll != null && _scroll.viewport != null) ? _scroll.viewport.rect.height : 0f;
@@ -2176,7 +2237,7 @@ _hoverLineIdx = -1;
                 // The wheel is only ours while the box is focused; otherwise it belongs
                 // to the camera.
                 float wheel = Input.mouseScrollDelta.y;
-                if (_chatActive && overLog && Mathf.Abs(wheel) > 0.01f)
+                if (wheelForLog && Mathf.Abs(wheel) > 0.01f)
                 {
                     _logOffsetTarget = Mathf.Clamp(
                         _logOffsetTarget - wheel * LogScrollPixelsPerNotch,
@@ -2212,8 +2273,8 @@ _hoverLineIdx = -1;
                 // does not move the position, so a delta-only test misses the scroll
                 // exactly when a window move is needed.
                 bool settle = _ignoreScrollFrames > 0;
-                bool wheelUp = _chatActive && wheel > 0.01f && overLog;
-                bool wheelDown = _chatActive && wheel < -0.01f && overLog;
+                bool wheelUp = wheelForLog && wheel > 0.01f;
+                bool wheelDown = wheelForLog && wheel < -0.01f;
                 bool deltaUp = !settle && _lastScrollNorm >= 0f && curScroll - _lastScrollNorm > 0.0005f;
                 bool deltaDown = !settle && _lastScrollNorm >= 0f && _lastScrollNorm - curScroll > 0.0005f;
                 bool intentUp = wheelUp || deltaUp;
@@ -2581,6 +2642,24 @@ _hoverLineIdx = -1;
         return lum > 0.5f ? new Color(0.16f, 0.16f, 0.16f, 1f) : new Color(1f, 1f, 1f, 1f);
     }
 
+    // A faint full-width panel behind one special color row and its "Applies to" strip.
+    // It ties the strip to its row so the switches are not read as belonging to the
+    // next row down.
+    static void BuildColorGroupBackground(Transform parent, int layer, float rowY, float stripY)
+    {
+        float top = rowY + 12f;
+        float bottom = stripY - 10f;
+        GameObject bg = UiFactory.Create("ColorGroupBg", parent, layer);
+        RectTransform rt = bg.GetComponent<RectTransform>();
+        rt.anchorMin = new Vector2(0f, 1f);
+        rt.anchorMax = new Vector2(1f, 1f);
+        rt.pivot = new Vector2(0.5f, 1f);
+        rt.anchoredPosition = new Vector2(0f, top);
+        rt.sizeDelta = new Vector2(-8f, top - bottom);
+        Image img = UiFactory.Background(bg, Theme.RowStripe);
+        img.raycastTarget = false;
+    }
+
     static void BuildColorSwatchRow(Transform parent, int layer, int row, float y)
     {
         GameObject lab = UiFactory.Create("ColorLabel" + row, parent, layer);
@@ -2614,26 +2693,28 @@ _hoverLineIdx = -1;
         _ => null,
     };
 
-    // A small G L C W switch row under a special color row. Each switch turns that
+    // A small channel switch row under a special color row. Each switch turns that
     // group's color on or off for one channel, so the line falls back to the next
     // tier and then to the channel color.
     static void BuildColorChannelStrip(Transform parent, int layer, ChatColorGroup group, float y)
     {
         GameObject lab = UiFactory.Create("ScopeLabel" + group, parent, layer);
-        UiFactory.AnchorPoint(lab, new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(8f, y), new Vector2(64f, 16f));
-        UiFactory.Label(lab, "Applies to", Theme.FontSizeSmall, Theme.TextMuted);
+        UiFactory.AnchorPoint(lab, new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(18f, y), new Vector2(100f, 14f));
+        TextMeshProUGUI labTmp = UiFactory.Label(lab, "Applies to", 10f, Theme.TextMuted);
+        labTmp.enableWordWrapping = false;
 
         ChatChannel[] channels = [ChatChannel.Global, ChatChannel.Local, ChatChannel.Clan, ChatChannel.Whisper];
-        string[] codes = ["G", "L", "C", "W"];
+        string[] words = ["Global", "Local", "Clan", "Whisper"];
         for (int i = 0; i < channels.Length; i++)
         {
             ChatChannel channel = channels[i];
-            GameObject btn = UiFactory.Create("Scope" + group + "_" + codes[i], parent, layer);
-            UiFactory.AnchorPoint(btn, new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(76f + i * 30f, y), new Vector2(26f, 18f));
+            GameObject btn = UiFactory.Create("Scope" + group + "_" + words[i], parent, layer);
+            UiFactory.AnchorPoint(btn, new Vector2(0f, 1f), new Vector2(0f, 0.5f), new Vector2(124f + i * 58f, y), new Vector2(54f, 16f));
             Image bg = UiFactory.Background(btn, Theme.ButtonBg);
             GameObject labelGo = UiFactory.Create("Label", btn.transform, layer);
             UiFactory.FillParent(labelGo);
-            TextMeshProUGUI tmp = UiFactory.Label(labelGo, codes[i], Theme.FontSizeSmall, Theme.TextPrimary, TextAlignmentOptions.Center);
+            TextMeshProUGUI tmp = UiFactory.Label(labelGo, words[i], 10f, Theme.TextPrimary, TextAlignmentOptions.Center);
+            tmp.enableWordWrapping = false;
 
             void ApplyVisual()
             {
@@ -2989,11 +3070,13 @@ _hoverLineIdx = -1;
             : (!_viewHelp && _settingsScroll != null ? _settingsScroll.viewport : null);
         if (sbar == null || barRect == null || viewport == null) return;
 
-        bool overView = ScreenPointWithinRect(viewport);
         bool overBar = ScreenPointWithinRect(barRect);
 
+        // The whole window captures the wheel while the chat UI is focused. The
+        // settings page scrolls whenever the pointer is over the window, matching the
+        // chat log behavior. Outside the window the wheel zooms the camera.
         float wheel = Input.mouseScrollDelta.y;
-        if ((overView || overBar) && Mathf.Abs(wheel) > 0.01f)
+        if (CapturesWheel && Mathf.Abs(wheel) > 0.01f)
         {
             sbar.value = Mathf.Clamp01(sbar.value + wheel * WheelScrollStep);
         }
@@ -3293,9 +3376,21 @@ _hoverLineIdx = -1;
 
     static void OnLineCaptured(ChatLine line)
     {
-        HistoryService.RecordLine(line);
-        if (!HistoryService.IsSeeding) MarkActivity();
+        // Restored lines are seeded into the log when history loads. Do not record them
+        // again, or the saved store reverses and drops the newest lines.
+        if (!HistoryService.IsSeeding)
+        {
+            HistoryService.RecordLine(line);
+            MarkActivity();
+        }
         _logDirty = true;
+    }
+
+    static string Trunc(string text, int max)
+    {
+        if (string.IsNullOrEmpty(text)) return string.Empty;
+        string flat = text.Replace('\n', ' ').Replace('\r', ' ');
+        return flat.Length <= max ? flat : flat.Substring(0, max);
     }
 
     static int VisibleLength(string richText)
@@ -3534,6 +3629,23 @@ _hoverLineIdx = -1;
                 _rebuildDiagLogAt = Time.realtimeSinceStartupAsDouble;
                 double ms = (Time.realtimeSinceStartupAsDouble - t0) * 1000.0;
                 Core.Log.LogInfo($"[ChatPlus][Rebuild] win=[{_winStart}..{_winEnd}] newest={newest} lines={_renderedLines.Count} chars={_log.text.Length} tail={tail} meshMs={ms:0.0}");
+            }
+
+            // TEMP diagnostic: print the first and last few rendered lines so the
+            // on-screen order can be compared against the saved file.
+            if (OrderDiag && Time.realtimeSinceStartupAsDouble - _orderDiagAt > 1.0)
+            {
+                _orderDiagAt = Time.realtimeSinceStartupAsDouble;
+                var diag = new System.Text.StringBuilder();
+                diag.Append($"[ChatPlus][Order] win=[{_winStart}..{_winEnd}] total={lines.Count} tail={tail} first5:");
+                int headEnd = Math.Min(_winEnd, _winStart + 4);
+                for (int i = _winStart; i <= headEnd; i++)
+                    diag.Append($" {lines[i].ReceivedUtc:HH:mm:ss}|{Trunc(lines[i].Text, 24)}");
+                diag.Append(" | last5:");
+                int tailStart = Math.Max(_winStart, _winEnd - 4);
+                for (int i = tailStart; i <= _winEnd; i++)
+                    diag.Append($" {lines[i].ReceivedUtc:HH:mm:ss}|{Trunc(lines[i].Text, 24)}");
+                Core.Log.LogInfo(diag.ToString());
             }
         }
         catch (Exception ex)

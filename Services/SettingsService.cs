@@ -134,6 +134,19 @@ internal static class SettingsService
         }
     }
 
+    // Zoom capture: while the chat UI owns the wheel, the mouse wheel must not reach
+    // the camera. Master kill-switch (default on), read every frame.
+    public static bool ZoomCaptureEnabled
+    {
+        get => _settings.ZoomCaptureEnabled ?? true;
+        set
+        {
+            if ((_settings.ZoomCaptureEnabled ?? true) == value) return;
+            _settings.ZoomCaptureEnabled = value;
+            _dirty = true;
+        }
+    }
+
     public static bool TryGetChannelHex(ChatChannel channel, out string hex)
     {
         hex = channel switch
@@ -329,6 +342,7 @@ internal static class SettingsService
         public bool? MirrorLayout { get; set; }
         public bool? ShowTimestamp { get; set; }
         public bool? ShowChannelIndicator { get; set; }
+        public bool? ZoomCaptureEnabled { get; set; }
         public string? ChannelGlobalHex { get; set; }
         public string? ChannelLocalHex { get; set; }
         public string? ChannelClanHex { get; set; }
